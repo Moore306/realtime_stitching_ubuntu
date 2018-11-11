@@ -9,13 +9,15 @@ using namespace std;
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
+#include<opencv2/imgproc.hpp>
 using namespace cv;
+#include "opencv2/opencv.hpp" 
 cv::Mat color, depth, last_color;
 bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2);
 int main( int argc, char** argv )
 {
   
-    cv::Mat color,last_color,color_show;
+    cv::Mat color,last_color,color_show,result;
     VideoCapture capture;
     capture.open(0);
     int index=0;
@@ -25,6 +27,7 @@ int main( int argc, char** argv )
     {
       
 	list< cv::Point2f > keypoints;      // 因为要删除跟踪失败的点，使用list
+	vector <Point2f>  keypoints_next;
 	vector<cv::Point2f> next_keypoints; 
 	vector<cv::Point2f> prev_keypoints;
 	vector<unsigned char> status;
@@ -46,7 +49,7 @@ int main( int argc, char** argv )
 	    if (index++ ==0 )
 	    {
 		// 对第一帧提取FAST特征点
-		
+		//color=imread("../c.png");
 		cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create();
 		detector->detect( color, kps );
 		for(auto kp:kps)
@@ -63,7 +66,7 @@ int main( int argc, char** argv )
 	    if ( color.data==nullptr )
 		continue;
 	    // 对其他帧用LK跟踪特征点
-	   
+	    //color=imread("../d.png");
 	    cout<<"prev_keypoints size  "<<prev_keypoints.size()<<endl;
 	  
 	    chrono::steady_clock::time_point t1 = chrono::steady_clock::now();  
@@ -77,6 +80,7 @@ int main( int argc, char** argv )
 	    cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
 	    // 把跟丢的点删掉
 	    int i=0; 
+	    keypoints_next.clear();
 	    for ( auto iter=keypoints.begin(); iter!=keypoints.end(); i++)
 	    {
 		if ( status[i]== 0 )
@@ -85,8 +89,9 @@ int main( int argc, char** argv )
 		    iter = keypoints.erase(iter);
 		    continue;
 		}
-		cout<<*iter<<"  ------------  "<<next_keypoints[i]<<endl;
+		//cout<<*iter<<"  ------------  "<<next_keypoints[i]<<endl;
 		*iter = next_keypoints[i];
+		keypoints_next.push_back(next_keypoints[i]);
 		iter++;
 	    }
 	    cout<<"tracked keypoints: "<<keypoints.size()<<endl;
@@ -95,11 +100,21 @@ int main( int argc, char** argv )
 		cout<<"all keypoints are lost."<<endl;
 		break; 
 	    }
+	    
 	    // 画出 keypoints
 	    prev_keypoints.clear();
 	    next_keypoints.clear();
 	    for(auto kp:keypoints)
 	      prev_keypoints.push_back(kp);
+	    Mat H = findHomography(prev_keypoints,keypoints_next);  
+	    cout<<H<<endl;
+	    warpPerspective(last_color, result, H,color.size());
+	    result=result/2+color/2;
+	    cout<<result.size()<<endl;
+	    imwrite("color.jpg",color);
+	    imwrite("last_color.jpg",last_color);
+	    imshow("result",result);
+	    imwrite("result.jpg",result);
 	    color_show=color.clone();
 	    for ( auto kp:keypoints )
 	        //drawKeypoints(color, kps,color_show, Scalar(0,255,255));
@@ -113,6 +128,8 @@ int main( int argc, char** argv )
 	    cv::imshow("corners", color_show);
 	  
 	    last_color = color.clone();
+	    //if(index==2)
+	      //break;
 	
 	} 
     }
