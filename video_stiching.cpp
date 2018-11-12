@@ -12,17 +12,30 @@ int main()
     Mat img11 = imread("../c.png");
     Mat img22 = imread("../d.png");
     Mat img1,img2;
+    VideoCapture capture1,capture2;
+    capture1.open(1);
+    capture2.open(2);
+//     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+//   
+//     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+    
     while(true)
     {
-//         if(waitKey(1) >= 0)
-//  	        break;
+         if(waitKey(1) >= 0)
+  	        break;
+        capture1>>img11;
+	capture2>>img22;
+	imshow("img11",img11);
+	imshow("img22",img22);
 	cvtColor(img11,img1,CV_BGR2GRAY);
 	cvtColor(img22,img2,CV_BGR2GRAY);
 	// 判断输入图像是否读取成功
 	if (img1.empty() || img2.empty() || img1.channels() != 1 || img2.channels() != 1)
 	{
 	    cout << "Input Image is nullptr or the image channels is not gray!" << endl;
-	    system("pause");
+	    //system("pause");
 	}
 	vector<Point2f> kps1,kps2;
 	Mat H;
@@ -34,12 +47,17 @@ int main()
 	Mat tiledImg;
 	Mat shftMat=(Mat_<double>(3,3)<<1.0,0,img1.cols, 0,1.0,0, 0,0,1.0);
 	warpPerspective(img11,tiledImg,shftMat*H,Size(img1.cols+img2.cols,img2.rows));
-	img22.copyTo(Mat(tiledImg,Rect(img1.cols,0,img2.cols,img2.rows)));
+	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type());
+	cout<<tiledImg2.size()<<tiledImg.size()<<endl;
+	img22/=2;
+	img22.copyTo(Mat(tiledImg2,Rect(img1.cols,0,img2.cols,img2.rows)));
 	chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
 	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t2-t1 );
 	cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
 	//imwrite("tied.jpg",tiledImg);
-	imshow("result",tiledImg);
+	tiledImg2=tiledImg2/2+tiledImg/2;
+	imshow("result",tiledImg2);
+	resizeWindow("result", 640, 480);
     }
 }
 
@@ -102,7 +120,7 @@ int main2(void)
     cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" \
          << kpts2.size() << ") = goodMatchesKpts: " << goodMatchKpts.size() << endl;
 
-    waitKey(0);
+    //waitKey(0);
 
     // RANSAC Geometric Verification
     if (goodMatchKpts.size() < 4)
@@ -179,7 +197,7 @@ void regis(Mat& img1,Mat& img2,vector<Point2f> obj,vector<Point2f> scene,Mat &H)
     cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" \
          << kpts2.size() << ") = goodMatchesKpts: " << goodMatchKpts.size() << endl;
 
-    waitKey(0);
+    //waitKey(0);
 
     // RANSAC Geometric Verification
     if (goodMatchKpts.size() < 4)
