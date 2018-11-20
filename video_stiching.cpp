@@ -19,8 +19,8 @@ int main( int argc, char** argv )
     VideoCapture capture;
     capture.open(0);
     int index=0;
-    capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-    capture.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+   // capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+   // capture.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     if(capture.isOpened())
     {
       
@@ -111,6 +111,11 @@ int main( int argc, char** argv )
             Scalar(255, 255, 255), // white
             1, LINE_AA); // line thickness and type
 	    cv::imshow("corners", color_show);
+	    if(index%10==0)
+	    {
+	      sprintf(info,"flow/flow_%3d.jpg",index);
+	      imwrite(info,color_show);
+	    }
 	  
 	    last_color = color.clone();
 	
