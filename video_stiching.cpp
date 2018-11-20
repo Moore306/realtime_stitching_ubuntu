@@ -19,8 +19,8 @@ int main( int argc, char** argv )
     VideoCapture capture;
     capture.open(0);
     int index=0;
-   // capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-   // capture.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+   //capture.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     if(capture.isOpened())
     {
       
@@ -33,13 +33,17 @@ int main( int argc, char** argv )
 	vector<Point2f> * pre_frame,next_frame;
 	vector<cv::KeyPoint> kps;
 	char info[500];
+	chrono::steady_clock::time_point t0 = chrono::steady_clock::now(); 
+	chrono::steady_clock::time_point tend = chrono::steady_clock::now();
         while(true)
         {
 	    status.clear();
 	    
 	    error.clear();
             capture.read(color);
-	    cout<<"video size "<<color.size()<<endl;
+	    //cout<<"video size "<<color.size()<<endl;
+	    if(index==101)
+	      break;
 	    
  	    if(waitKey(1) >= 0)
 	        break;
@@ -73,6 +77,7 @@ int main( int argc, char** argv )
 	    cv::calcOpticalFlowPyrLK( last_color, color, prev_keypoints, next_keypoints, status, error );
 	    imshow("differ",last_color-color);
 	    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+	    tend=t2;
 	    chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t2-t1 );
 	    cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
 	    // 把跟丢的点删掉
@@ -81,11 +86,11 @@ int main( int argc, char** argv )
 	    {
 		if ( status[i]== 0 )
 		{
-		    cout<<"################################## "<<status[i]<<endl;
+		    //cout<<"################################## "<<status[i]<<endl;
 		    iter = keypoints.erase(iter);
 		    continue;
 		}
-		cout<<*iter<<"  ------------  "<<next_keypoints[i]<<endl;
+		//cout<<*iter<<"  ------------  "<<next_keypoints[i]<<endl;
 		*iter = next_keypoints[i];
 		iter++;
 	    }
@@ -120,8 +125,11 @@ int main( int argc, char** argv )
 	    last_color = color.clone();
 	
 	} 
+	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( tend-t0);
+	    cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
     }
-   
+    
+    
     return 0;
 }
 bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
