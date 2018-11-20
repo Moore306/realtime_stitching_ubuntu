@@ -4,31 +4,53 @@
 #include <chrono>
 using namespace std;
 using namespace cv;
-void regis(Mat& img1,Mat& img2,vector<Point2f> obj,vector<Point2f> scene,Mat &H);
+void regis(Mat& img1,Mat& img2,vector<Point2f>& obj,vector<Point2f>& scene,Mat &H);
+Mat Get_blendSize(int& width, int& height, Mat1f& H,Point2f& offset);
 int main()
 {
    
   // 配置图像路径
-    Mat img11 = imread("../c.png");
-    Mat img22 = imread("../d.png");
+    //Mat img11 = imread("../c.png");
+    //Mat img22 = imread("../d.png");
+    //cout<<img11.size()<<endl;
+    int width,height;
+    Mat img11,img22;
     Mat img1,img2;
     VideoCapture capture1,capture2;
-    capture1.open(1);
-    capture2.open(2);
-//     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-//     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+    int index=0;
+    capture1.open(0);
+    capture2.open(1);
+    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+    capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //   
-//     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-//     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     
     while(true)
     {
+      
+        //if(index++!=0)
+	  //break;
          if(waitKey(1) >= 0)
-  	        break;
+	 { //break;
+	   
+	   imwrite("a.jpg",img11);
+	   imwrite("b.jpg",img22);
+	   
+	 }
+  	        
         capture1>>img11;
 	capture2>>img22;
+	namedWindow("img11",0);
+	namedWindow("img22",0);
+	resizeWindow("img11", 640, 480);
+	resizeWindow("img22", 640, 480);
 	imshow("img11",img11);
 	imshow("img22",img22);
+	
+	width=img11.cols;
+	height=img11.rows;
+	continue;
 	cvtColor(img11,img1,CV_BGR2GRAY);
 	cvtColor(img22,img2,CV_BGR2GRAY);
 	// 判断输入图像是否读取成功
@@ -38,30 +60,52 @@ int main()
 	    //system("pause");
 	}
 	vector<Point2f> kps1,kps2;
-	Mat H;
+	Mat1f H;
 	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 	regis(img1,img2,kps1,kps2,H);
+	if(kps1.size()<100)
+	{
+	  cout<<"kps1"<<endl;
+	  continue;
+	}
 	cout<<H<<endl;
-    
+	//H=H1;;
+	Point2f offset(0,0);
+	cout <<width<<"  "<<height<<endl;
+	Mat1f H1=Get_blendSize(width, height, H,offset);
+	//H=H1;
+	cout<<"another H "<<H<<endl;
+	cout <<width<<"  "<<height<<endl;
+	if(width<img11.cols||width>2*img11.cols||height<img11.rows||height>2*img11.rows)
+	{//index=0;
+	  cout <<"continue"<<endl;
+	  continue;
+	  
+	}
+	cout<<offset<<endl;
+	offset=-offset;
 	//拼接图像
 	Mat tiledImg;
-	Mat shftMat=(Mat_<double>(3,3)<<1.0,0,img1.cols, 0,1.0,0, 0,0,1.0);
-	warpPerspective(img11,tiledImg,shftMat*H,Size(img1.cols+img2.cols,img2.rows));
+	Mat shftMat=(Mat_<double>(3,3)<<1.0,0,offset.x, 0,1.0,offset.y, 0,0,1.0);
+	warpPerspective(img11,tiledImg,shftMat*H,Size(width+50,height+50));
+	//warpPerspective(img11,tiledImg,H,Size(width,height));
 	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type());
 	cout<<tiledImg2.size()<<tiledImg.size()<<endl;
 	img22/=2;
-	img22.copyTo(Mat(tiledImg2,Rect(img1.cols,0,img2.cols,img2.rows)));
+	img22.copyTo(Mat(tiledImg2,Rect(offset.x,offset.y,img2.cols,img2.rows)));
 	chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
 	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t2-t1 );
 	cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
 	//imwrite("tied.jpg",tiledImg);
 	tiledImg2=tiledImg2/2+tiledImg/2;
 	imshow("result",tiledImg2);
+	imwrite("result.jpg",tiledImg2);
 	resizeWindow("result", 640, 480);
+	index=0;
     }
 }
 
-int main2(void)
+/*int main2(void)
 {
     // 配置图像路径
     Mat img1 = imread("../c.png", 0);
@@ -154,8 +198,9 @@ int main2(void)
     system("pause");
     return 0;
 }
+*/
 
-void regis(Mat& img1,Mat& img2,vector<Point2f> obj,vector<Point2f> scene,Mat &H)
+void regis(Mat& img1,Mat& img2,vector<Point2f>& obj,vector<Point2f>& scene,Mat &H)
 {
     obj.clear();
     scene.clear();
@@ -220,7 +265,52 @@ void regis(Mat& img1,Mat& img2,vector<Point2f> obj,vector<Point2f> scene,Mat &H)
     // 点集变换标出匹配重复区域
     //perspectiveTransform(obj_corners, scene_corners, H);
 }
+Mat Get_blendSize(int& width, int& height, Mat1f& H,Point2f& offset) {
+  cout <<"sdf"<<endl;
+	//存储左图四角，及其变换到右图位置
+	std::vector<Point2f> obj_corners(4);
+	obj_corners[0] = Point2f(0, 0); obj_corners[1] = Point2f(width,0);
+	obj_corners[2] = Point2f(width, height); obj_corners[3] = Point2f(0, height);
+        cout<<obj_corners[2]<<endl;
+	std::vector<Point2f> scene_corners(4);
+	cout<<2<<endl;
+	perspectiveTransform(obj_corners, scene_corners, H);
+        cout<<3<<endl;
+	//画出变换后图像位置
 
+	int drift = scene_corners[1].x;                                                        //储存偏移量
+
+																						   //新建一个矩阵存储配准后四角的位置
+	width = int(max(abs(scene_corners[1].x), abs(scene_corners[2].x)));
+	//int height= img1.rows;
+	height = int(max(abs(scene_corners[2].y), abs(scene_corners[3].y)));
+	//或者：int height = int(max(abs(scene_corners[2].y), abs(scene_corners[3].y)));
+	float origin_x = 0, origin_y = 0;
+	if (scene_corners[0].x<0) {
+		if (scene_corners[3].x<0) origin_x += min(scene_corners[0].x, scene_corners[3].x);
+		else origin_x += scene_corners[0].x;
+	}
+	width -= int(origin_x);
+	if (scene_corners[0].y<0) {
+		if (scene_corners[1].y<0) origin_y += min(scene_corners[0].y, scene_corners[1].y);
+		else origin_y += scene_corners[0].y;
+	}
+	height -= int(origin_y);
+	
+
+	//获取新的变换矩阵，使图像完整显示
+	for (int i = 0; i<4; i++) {
+		scene_corners[i].x -= origin_x;
+		scene_corners[i].y -= origin_y;
+	} 	//可选：scene_corners[i].y -= (float)origin_y; }
+        offset.x=-origin_x;
+	offset.y=-origin_y;
+
+	Mat H1 = getPerspectiveTransform(obj_corners, scene_corners);
+	return H1;
+	
+
+}
 // #include <iostream>
 // #include <fstream>
 // #include <list>
