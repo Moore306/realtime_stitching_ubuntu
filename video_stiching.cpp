@@ -18,13 +18,16 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open(2);
-    capture2.open(1);
-//    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
- //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+    capture1.open("test1.mkv");
+    capture2.open("test2.mkv");
+    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+    capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //   
- //    capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-  //   capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+     
+     capture1.set(CV_CAP_PROP_FPS,30);
+     capture2.set(CV_CAP_PROP_FPS,30);
     
     while(true)
     {
@@ -77,7 +80,7 @@ int main()
 	cout<<"another H "<<H<<endl;
 	cout <<width<<"  "<<height<<endl;
 
-	if(width<img11.cols||width>2*img11.cols||height<img11.rows||height>2*img11.rows)
+	if(width<img11.cols||width>5*img11.cols||height<img11.rows||height>5*img11.rows)
 	{//index=0;
 	  cout <<"continue"<<endl;
 	  continue;
