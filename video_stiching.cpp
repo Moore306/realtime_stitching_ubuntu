@@ -27,7 +27,7 @@ Mat pre_frame1,pre_frame2;
 
 
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,list<Point2f> &kps_1,list<Point2f> & kps_2);
-
+void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,vector<Point2f>& prev_key1,vector<Point2f>&prev_key2);
 
 int main()
 {
@@ -41,8 +41,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open("test1.mkv");
-    capture2.open("test2.mkv");
+    capture1.open(0);
+    capture2.open(2);
     //    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
     //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     //   
@@ -51,6 +51,7 @@ int main()
     namedWindow("img11",0);
     namedWindow("img22",0);
     namedWindow("result",0);
+    vector<Point2f> kps1,kps2;
     while(true)
     {
 	
@@ -83,7 +84,7 @@ int main()
 	    cout << "Input Image is nullptr or the image channels is not gray!" << endl;
 	    //system("pause");
 	}
-	vector<Point2f> kps1,kps2;
+	
 	Mat1f H;
 	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 	if(index++==0)
@@ -93,24 +94,23 @@ int main()
 	    regis(img1,img2,kps1,kps2,H);
 	    cout<<"匹配点个数 "<<kps1.size()<<endl;
 	    
-	    for(int i=0;i<kps1.size();i++)
-	    {
-		keypts1.push_back(kps1[i]);
-		keypts2.push_back(kps2[i]);
-	    }
-	    
-	    
 	}
 	else
 	{
-	    kps1.clear();kps2.clear();
-	    opt_track(pre_frame1,img11,pre_frame2,img22,keypts1,keypts2);
-	    for(auto iter=keypts1.begin(),iter2=keypts2.begin();iter!=keypts1.end();iter++,iter2++)
+	    
+	    //opt_track(pre_frame1,img11,pre_frame2,img22,keypts1,keypts2);
+	    opt_track(pre_frame1,img11,pre_frame2,img22,kps1,kps2);
+	    if(kps1.size()<50)
 	    {
-		kps1.push_back(*iter);
-		kps2.push_back(*iter2);
+		index=0;
+		continue;
 	    }
 	    Mat H1 = findHomography(kps1, kps2, CV_RANSAC);
+	    if(H1.empty())
+	    {
+		index=0;
+		continue;
+	    }
 	    H=H1.clone();
 	
 	}
@@ -131,8 +131,9 @@ int main()
 	    cout<<"kps1"<<endl;
 	    index=0;
 	    continue;
-	}
-	cout<<"use "<<H.size()<<endl;
+	}	
+	cout<<"use "<<H.empty()<<endl;
+
 	//H=H1;;
 	Point2f offset(0,0);
 	cout <<width<<"  "<<height<<endl;
@@ -144,6 +145,7 @@ int main()
 	if(width<img11.cols||width>5*img11.cols||height<img11.rows||height>5*img11.rows)
 	{//index=0;
 	    cout <<"continue"<<endl;
+	    index=0;
 	    continue;
 	    
 	}
@@ -214,7 +216,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       obj.clear();
       scene.clear();
       // ORB算法继承Feature2D基类
-      Ptr<ORB> orb = ORB::create(2000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
+      Ptr<ORB> orb = ORB::create(4000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
       // 调整精度，值越小点越少，越精准
       vector<KeyPoint> kpts1, kpts2;
       // 特征点检测算法...
@@ -359,4 +361,52 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
      
      
       
+  }
+  
+  void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,vector<Point2f>& prev_key1,vector<Point2f>&prev_key2)
+  {
+    
+     
+      vector<unsigned char> status1,status2;
+      vector<Point2f>  next_key1,next_key2;
+      list<Point2f> kps_1;
+      list<Point2f>  kps_2;
+      vector<float> error1,error2;
+      for(auto kp:prev_key1)
+	  kps_1.push_back(kp);
+      
+      for(auto kp:prev_key2)
+	  kps_2.push_back(kp);
+      
+      cout<<"before kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
+      
+      calcOpticalFlowPyrLK( pre_1, cur_1, prev_key1, next_key1, status1, error1 );
+      calcOpticalFlowPyrLK( pre_2, cur_2, prev_key2, next_key2, status2, error2 );
+      int i=0;
+      for(auto iter=kps_1.begin(),iter2=kps_2.begin(); iter!=kps_1.end();i++)
+      {
+	  if ( status1[i]== 0 ||status2[i]==0)
+	  {
+	      //cout<<"################################## "<<status1[i]<<endl;
+	      iter = kps_1.erase(iter);
+	      iter2 = kps_2.erase(iter2);
+	  }
+	  //cout<<*iter<<"  ------------  "<<next_keypoints[i]<<endl;
+	  *iter=next_key1[i];
+	  *iter2=next_key2[i];
+	
+	  iter++;
+	  iter2++;
+	  
+	 
+	  
+	  
+      } 
+      prev_key1.clear();
+      prev_key2.clear();
+      for(auto k:kps_1)
+	  prev_key1.push_back(k);
+      for(auto k:kps_2)
+	  prev_key2.push_back(k);   
+      cout<<"after kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
   }
