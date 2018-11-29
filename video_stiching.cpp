@@ -41,14 +41,16 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open(2);
-    capture2.open(1);
+    capture1.open("test1.mkv");
+    capture2.open("test2.mkv");
     //    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
     //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     //   
     //    capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
     //   capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
-    
+    namedWindow("img11",0);
+    namedWindow("img22",0);
+    namedWindow("result",0);
     while(true)
     {
 	
@@ -64,12 +66,11 @@ int main()
 	
 	capture1>>img11;
 	capture2>>img22;
-	namedWindow("img11",0);
-	namedWindow("img22",0);
+	
 	resizeWindow("img11", 640, 480);
 	resizeWindow("img22", 640, 480);
-	imshow("img11",img11);
-	imshow("img22",img22);
+	resizeWindow("result", 640, 480);
+	
 	
 	width=img11.cols;
 	height=img11.rows;
@@ -90,6 +91,7 @@ int main()
 	    keypts1.clear();
 	    keypts2.clear();
 	    regis(img1,img2,kps1,kps2,H);
+	    cout<<"匹配点个数 "<<kps1.size()<<endl;
 	    
 	    for(int i=0;i<kps1.size();i++)
 	    {
@@ -112,15 +114,25 @@ int main()
 	    H=H1.clone();
 	
 	}
-	
-	
-	if(kps1.size()<10)
+	cout<<"tracked  key points num "<<kps1.size()<<endl;
+	Mat img111,img222;
+	img111=img11.clone();
+	img222=img22.clone();
+	for ( auto kp:kps1 )
+	    cv::circle(img111, kp, 1, cv::Scalar(0, 240, 0), 1);
+	for ( auto kp:kps2 )
+	    cv::circle(img222, kp, 1, cv::Scalar(0, 240, 0), 1);
+	imshow("img11",img111);
+	imshow("img22",img222);
+	imwrite("img11.jpg",img111);
+	imwrite("img22.jpg",img222);
+	if(kps1.size()<50)
 	{
 	    cout<<"kps1"<<endl;
 	    index=0;
 	    continue;
 	}
-	cout<<H<<endl;
+	cout<<"use "<<H.size()<<endl;
 	//H=H1;;
 	Point2f offset(0,0);
 	cout <<width<<"  "<<height<<endl;
@@ -129,13 +141,12 @@ int main()
 	cout<<"another H "<<H<<endl;
 	cout <<width<<"  "<<height<<endl;
 	
-	if(width<img11.cols||width>2*img11.cols||height<img11.rows||height>2*img11.rows)
+	if(width<img11.cols||width>5*img11.cols||height<img11.rows||height>5*img11.rows)
 	{//index=0;
 	    cout <<"continue"<<endl;
 	    continue;
 	    
 	}
-	
 	
 	cout <<"shift "<<offset<<endl;
 	//拼接图像
@@ -152,7 +163,7 @@ int main()
 	cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
 	//imwrite("tied.jpg",tiledImg);
 	tiledImg2=tiledImg2/2+tiledImg/2;
-	resizeWindow("result", 640, 480);
+	
 	imshow("result",tiledImg2);
 	imwrite("result.jpg",tiledImg2);
 	
@@ -203,7 +214,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       obj.clear();
       scene.clear();
       // ORB算法继承Feature2D基类
-      Ptr<ORB> orb = ORB::create(1000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
+      Ptr<ORB> orb = ORB::create(2000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
       // 调整精度，值越小点越少，越精准
       vector<KeyPoint> kpts1, kpts2;
       // 特征点检测算法...
@@ -237,7 +248,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	      
 	  }
       }
-      cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" \
+      //cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" \
       << kpts2.size() << ") = goodMatchesKpts: " << goodMatchKpts.size() << endl;
       
       //waitKey(0);
@@ -276,11 +287,11 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       
       //储存偏移量
       float w_min=0,h_max=height,w_max=width,h_min=0;
-      cout<<"WH pre   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
+      //cout<<"WH pre   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
       for(int i=0;i<4;i++)
       {
-	  cout<<scene_corners[i]<<"   "<<i<<endl;
-	  cout<<scene_corners[i].x<<endl;
+	  //cout<<scene_corners[i]<<"   "<<i<<endl;
+	  //cout<<scene_corners[i].x<<endl;
 	  if(scene_corners[i].x<w_min)
 	      w_min=scene_corners[i].x;
 	  if(scene_corners[i].x>w_max)
@@ -334,7 +345,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       {
 	  if ( status1[i]== 0 ||status2[i]==0)
 	  {
-	      cout<<"################################## "<<status1[i]<<endl;
+	      //cout<<"################################## "<<status1[i]<<endl;
 	      iter = kps_1.erase(iter);
 	      iter2 = kps_2.erase(iter2);
 	  }
@@ -344,6 +355,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  iter++;
 	  iter2++;
       } 
+   
      
      
       
