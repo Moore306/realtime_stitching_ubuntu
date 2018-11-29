@@ -41,8 +41,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open(0);
-    capture2.open(2);
+    capture1.open("test1.mkv");
+    capture2.open("test2.mkv");
     //    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
     //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     //   
@@ -52,6 +52,7 @@ int main()
     namedWindow("img22",0);
     namedWindow("result",0);
     vector<Point2f> kps1,kps2;
+    char info[500];
     while(true)
     {
 	
@@ -89,10 +90,21 @@ int main()
 	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 	if(index++==0)
 	{//orb for first frame 
-	    keypts1.clear();
-	    keypts2.clear();
+	
 	    regis(img1,img2,kps1,kps2,H);
 	    cout<<"匹配点个数 "<<kps1.size()<<endl;
+	    if(kps1.size()==0)
+		break;
+	    
+	    Mat img110,img220;
+	    img110=img11.clone();
+	    img220=img22.clone();
+	    for ( auto kp:kps1 )
+		cv::circle(img110, kp, 10, cv::Scalar(0, 240, 0), 1);
+	    for ( auto kp:kps2 )
+		cv::circle(img220, kp, 10, cv::Scalar(0, 240, 0), 1);
+	    imwrite("img110.jpg",img110);
+	    imwrite("img220.jpg",img220);
 	    
 	}
 	else
@@ -100,7 +112,7 @@ int main()
 	    
 	    //opt_track(pre_frame1,img11,pre_frame2,img22,keypts1,keypts2);
 	    opt_track(pre_frame1,img11,pre_frame2,img22,kps1,kps2);
-	    if(kps1.size()<50)
+	    if(kps1.size()<20||index>100)
 	    {
 		index=0;
 		continue;
@@ -112,20 +124,35 @@ int main()
 		continue;
 	    }
 	    H=H1.clone();
+	    Mat img111,img222;
+	    img111=img11.clone();
+	    img222=img22.clone();
+	    for ( auto kp:kps1 )
+		cv::circle(img111, kp, 10, cv::Scalar(0, 240, 0), 1);
+	    for ( auto kp:kps2 )
+		cv::circle(img222, kp, 10, cv::Scalar(0, 240, 0), 1);
+	    sprintf(info,"stream 1:tracked points num: %d frame :%d ",kps1.size(),index);
+	    putText(img111, info,
+		    Point(20, 50),
+		    FONT_HERSHEY_COMPLEX, 0.5, // font face and scale
+	     Scalar(255, 255, 255), // white
+		    1, LINE_AA); // line thickness and type
+	    
+	    sprintf(info,"stream 2:tracked points num: %d frame :%d ",kps2.size(),index);
+	    putText(img222, info,
+		    Point(20, 50),
+		    FONT_HERSHEY_COMPLEX, 0.5, // font face and scale
+	    Scalar(255, 255, 255), // white
+		    1, LINE_AA); // line thickness and type
+	    imshow("img11",img111);
+	    imshow("img22",img222);
+	    imwrite("img11.jpg",img111);
+	    imwrite("img22.jpg",img222);
 	
 	}
 	cout<<"tracked  key points num "<<kps1.size()<<endl;
-	Mat img111,img222;
-	img111=img11.clone();
-	img222=img22.clone();
-	for ( auto kp:kps1 )
-	    cv::circle(img111, kp, 1, cv::Scalar(0, 240, 0), 1);
-	for ( auto kp:kps2 )
-	    cv::circle(img222, kp, 1, cv::Scalar(0, 240, 0), 1);
-	imshow("img11",img111);
-	imshow("img22",img222);
-	imwrite("img11.jpg",img111);
-	imwrite("img22.jpg",img222);
+	
+	
 	if(kps1.size()<50)
 	{
 	    cout<<"kps1"<<endl;
@@ -269,7 +296,25 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  scene.push_back(kpts2[goodMatchKpts[i].trainIdx].pt);
       }
       // 估计Two Views变换矩阵
-      H = findHomography(obj, scene, CV_RANSAC);
+      //H = findHomography(obj, scene, CV_RANSAC);
+      vector<unsigned char> inliersMask(obj.size()); 
+      //匹配点对进行RANSAC过滤
+      H = findHomography(obj,scene,CV_RANSAC,5,inliersMask);
+      vector<Point2f> ransac_obj,ransac_scene;
+      for(int i=0;i<inliersMask.size();i++)
+      {
+	  if(inliersMask[i])
+	  {
+	      ransac_obj.push_back(obj[i]);
+	      ransac_scene.push_back(scene[i]);
+	  }
+      }
+      obj.clear();
+      scene.clear();
+      obj.assign(ransac_obj.begin(),ransac_obj.end());
+      scene.assign(ransac_scene.begin(),ransac_scene.end());
+ 
+
       vector<Point2f> obj_corners(4), scene_corners(4);
       obj_corners[0] = cvPoint(0, 0); obj_corners[1] = cvPoint(img1.cols, 0);
       obj_corners[2] = cvPoint(img1.cols, img1.rows); obj_corners[3] = cvPoint(0, img1.rows);
@@ -385,7 +430,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       int i=0;
       for(auto iter=kps_1.begin(),iter2=kps_2.begin(); iter!=kps_1.end();i++)
       {
-	  if ( status1[i]== 0 ||status2[i]==0)
+	  if ( status1[i]== 0)
 	  {
 	      //cout<<"################################## "<<status1[i]<<endl;
 	      iter = kps_1.erase(iter);
