@@ -43,11 +43,11 @@ int main()
     int index=0;
     capture1.open(2);
     capture2.open(0);
-    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-    capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
-    //   
-    capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-    capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+//     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+//     //   
+//     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     namedWindow("img11",0);
     namedWindow("img22",0);
     namedWindow("result",0);
@@ -103,8 +103,8 @@ int main()
 		cv::circle(img110, kp, 10, cv::Scalar(0, 240, 0), 1);
 	    for ( auto kp:kps2 )
 		cv::circle(img220, kp, 10, cv::Scalar(240, 240, 0), 1);
-	    imwrite("img110.jpg",img110);
-	    imwrite("img220.jpg",img220);
+	    //imwrite("img110.jpg",img110);
+	    //imwrite("img220.jpg",img220);
 	    
 	}
 	else
@@ -147,8 +147,8 @@ int main()
 		    1, LINE_AA); // line thickness and type
 	    imshow("img11",img111);
 	    imshow("img22",img222);
-	    imwrite("img11.jpg",img111);
-	    imwrite("img22.jpg",img222);
+	    //imwrite("img11.jpg",img111);
+	    //imwrite("img22.jpg",img222);
 	
 	}
 	pre_frame1=img11.clone();
@@ -158,19 +158,19 @@ int main()
 	
 	if(kps1.size()<50)
 	{
-	    cout<<"kps1"<<endl;
+	    //cout<<"kps num is too little  "<<endl;
 	    index=0;
 	    continue;
 	}	
-	cout<<"use "<<H.empty()<<endl;
+	//cout<<"use "<<H.empty()<<endl;
 
 	//H=H1;;
 	Point2f offset(0,0);
-	cout <<width<<"  "<<height<<endl;
+	//cout <<width<<"  "<<height<<endl;
 	Mat1f H1=Get_blendSize(width, height, H,offset);
 	H=H1.clone();
-	cout<<"another H "<<H<<endl;
-	cout <<width<<"  "<<height<<endl;
+	//cout<<"another H "<<H<<endl;
+	//cout <<width<<"  "<<height<<endl;
 	
 	if(width<img11.cols||width>5*img11.cols||height<img11.rows||height>5*img11.rows)
 	{//index=0;
@@ -180,14 +180,14 @@ int main()
 	    
 	}
 	
-	cout <<"shift "<<offset<<endl;
+	//cout <<"shift "<<offset<<endl;
 	//拼接图像
 	Mat tiledImg;
 	//Mat shftMat=(Mat_<double>(3,3)<<1.0,0,offset.x, 0,1.0,offset.y, 0,0,1.0);
 	//warpPerspective(img11,tiledImg,shftMat*H,Size(width+50,height+50));
 	warpPerspective(img11,tiledImg,H,Size(width,height));
 	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type());
-	cout<<tiledImg2.size()<<tiledImg.size()<<endl;
+	//cout<<tiledImg2.size()<<tiledImg.size()<<endl;
 	img22/=2;
 	img22.copyTo(Mat(tiledImg2,Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
 	chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
@@ -197,7 +197,7 @@ int main()
 	tiledImg2=tiledImg2/2+tiledImg/2;
 	
 	imshow("result",tiledImg2);
-	imwrite("result.jpg",tiledImg2);
+	//imwrite("result.jpg",tiledImg2);
 	
 	
     }
@@ -328,7 +328,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       std::vector<Point2f> obj_corners(4);
       obj_corners[0] = Point2f(0, 0); obj_corners[1] = Point2f(width,0);
       obj_corners[2] = Point2f(width, height); obj_corners[3] = Point2f(0, height);
-      cout<<obj_corners[2]<<endl;
+      //cout<<obj_corners[2]<<endl;
       std::vector<Point2f> scene_corners(4);
       
       perspectiveTransform(obj_corners, scene_corners, H);
@@ -351,7 +351,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	      h_max=scene_corners[i].y;
 	  
       }
-      cout<<"WH   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
+      //cout<<"WH   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
       //新建一个矩阵存储配准后四角的位置
       width = w_max-w_min+50;
       //int height= img1.rows;
@@ -364,7 +364,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  scene_corners[i].x-=offset.x;
 	  scene_corners[i].y-=offset.y;
       }
-      cout<<"out size "<<width<<"  "<<height<<endl;
+      //cout<<"out size "<<width<<"  "<<height<<endl;
       
       Mat H1 = getPerspectiveTransform(obj_corners, scene_corners);
       return H1;
@@ -425,7 +425,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       for(auto kp:prev_key2)
 	  kps_2.push_back(kp);
       
-      cout<<"before kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
+      //cout<<"before kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
       
       calcOpticalFlowPyrLK( pre_1, cur_1, prev_key1, next_key1, status1, error1 );
       calcOpticalFlowPyrLK( pre_2, cur_2, prev_key2, next_key2, status2, error2 );
@@ -455,5 +455,5 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  prev_key1.push_back(k);
       for(auto k:kps_2)
 	  prev_key2.push_back(k);   
-      cout<<"after kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
+      //cout<<"after kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
   }
