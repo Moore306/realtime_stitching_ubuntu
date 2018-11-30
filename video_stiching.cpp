@@ -41,8 +41,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open("test1.mkv");
-    capture2.open("test2.mkv");
+    capture1.open(2);
+    capture2.open(0);
     //    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
     //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     //   
@@ -102,7 +102,7 @@ int main()
 	    for ( auto kp:kps1 )
 		cv::circle(img110, kp, 10, cv::Scalar(0, 240, 0), 1);
 	    for ( auto kp:kps2 )
-		cv::circle(img220, kp, 10, cv::Scalar(0, 240, 0), 1);
+		cv::circle(img220, kp, 10, cv::Scalar(240, 240, 0), 1);
 	    imwrite("img110.jpg",img110);
 	    imwrite("img220.jpg",img220);
 	    
@@ -117,6 +117,8 @@ int main()
 		index=0;
 		continue;
 	    }
+	    for(auto kp:kps2)
+		cout<<kp<<endl;
 	    Mat H1 = findHomography(kps1, kps2, CV_RANSAC);
 	    if(H1.empty())
 	    {
@@ -128,9 +130,9 @@ int main()
 	    img111=img11.clone();
 	    img222=img22.clone();
 	    for ( auto kp:kps1 )
-		cv::circle(img111, kp, 10, cv::Scalar(0, 240, 0), 1);
+		cv::circle(img111, kp, 10, Scalar(0, 240, 0), 1);
 	    for ( auto kp:kps2 )
-		cv::circle(img222, kp, 10, cv::Scalar(0, 240, 0), 1);
+		cv::circle(img222, kp, 10, Scalar(240, 240, 0), 1);
 	    sprintf(info,"stream 1:tracked points num: %d frame :%d ",kps1.size(),index);
 	    putText(img111, info,
 		    Point(20, 50),
@@ -150,6 +152,8 @@ int main()
 	    imwrite("img22.jpg",img222);
 	
 	}
+	pre_frame1=img11.clone();
+	pre_frame2=img22.clone();
 	cout<<"tracked  key points num "<<kps1.size()<<endl;
 	
 	
@@ -196,8 +200,7 @@ int main()
 	imshow("result",tiledImg2);
 	imwrite("result.jpg",tiledImg2);
 	
-	pre_frame1=img11.clone();
-	pre_frame2=img22.clone();
+	
     }
 }
 
@@ -430,9 +433,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       int i=0;
       for(auto iter=kps_1.begin(),iter2=kps_2.begin(); iter!=kps_1.end();i++)
       {
-	  if ( status1[i]== 0)
+	  if ( status1[i]== 0||status2[i]==0)
 	  {
-	      //cout<<"################################## "<<status1[i]<<endl;
+	      cout<<"################################## "<<status2[i]<<endl;
 	      iter = kps_1.erase(iter);
 	      iter2 = kps_2.erase(iter2);
 	  }
