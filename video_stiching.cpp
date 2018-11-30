@@ -27,7 +27,9 @@ Mat pre_frame1,pre_frame2;
 
 
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,list<Point2f> &kps_1,list<Point2f> & kps_2);
+
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,vector<Point2f>& prev_key1,vector<Point2f>&prev_key2);
+
 
 int main()
 {
@@ -53,6 +55,7 @@ int main()
     namedWindow("result",0);
     vector<Point2f> kps1,kps2;
     char info[500];
+
     while(true)
     {
 	
@@ -68,11 +71,13 @@ int main()
 	
 	capture1>>img11;
 	capture2>>img22;
+
 	
 	resizeWindow("img11", 640, 480);
 	resizeWindow("img22", 640, 480);
 	resizeWindow("result", 640, 480);
 	
+
 	
 	width=img11.cols;
 	height=img11.rows;
@@ -85,11 +90,12 @@ int main()
 	    cout << "Input Image is nullptr or the image channels is not gray!" << endl;
 	    //system("pause");
 	}
-	
+
 	Mat1f H;
 	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 	if(index++==0)
 	{//orb for first frame 
+
 	
 	    regis(img1,img2,kps1,kps2,H);
 	    cout<<"匹配点个数 "<<kps1.size()<<endl;
@@ -105,10 +111,12 @@ int main()
 		cv::circle(img220, kp, 10, cv::Scalar(240, 240, 0), 1);
 	    //imwrite("img110.jpg",img110);
 	    //imwrite("img220.jpg",img220);
+
 	    
 	}
 	else
 	{
+
 	    
 	    //opt_track(pre_frame1,img11,pre_frame2,img22,keypts1,keypts2);
 	    opt_track(pre_frame1,img11,pre_frame2,img22,kps1,kps2);
@@ -200,6 +208,7 @@ int main()
 	//imwrite("result.jpg",tiledImg2);
 	
 	
+
     }
 }
 
@@ -245,7 +254,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       obj.clear();
       scene.clear();
       // ORB算法继承Feature2D基类
+
       Ptr<ORB> orb = ORB::create(4000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
+
       // 调整精度，值越小点越少，越精准
       vector<KeyPoint> kpts1, kpts2;
       // 特征点检测算法...
@@ -279,8 +290,8 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	      
 	  }
       }
-      //cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" \
-      << kpts2.size() << ") = goodMatchesKpts: " << goodMatchKpts.size() << endl;
+
+      //cout << "(kpts1: " << kpts1.size() << ") && (kpts2:" << kpts2.size() << ") = goodMatchesKpts: " << goodMatchKpts.size() << endl;
       
       //waitKey(0);
       
@@ -298,6 +309,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  scene.push_back(kpts2[goodMatchKpts[i].trainIdx].pt);
       }
       // 估计Two Views变换矩阵
+
       //H = findHomography(obj, scene, CV_RANSAC);
       vector<unsigned char> inliersMask(obj.size()); 
       //匹配点对进行RANSAC过滤
@@ -328,7 +340,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       std::vector<Point2f> obj_corners(4);
       obj_corners[0] = Point2f(0, 0); obj_corners[1] = Point2f(width,0);
       obj_corners[2] = Point2f(width, height); obj_corners[3] = Point2f(0, height);
+
       //cout<<obj_corners[2]<<endl;
+
       std::vector<Point2f> scene_corners(4);
       
       perspectiveTransform(obj_corners, scene_corners, H);
@@ -336,11 +350,13 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       
       //储存偏移量
       float w_min=0,h_max=height,w_max=width,h_min=0;
+
       //cout<<"WH pre   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
       for(int i=0;i<4;i++)
       {
 	  //cout<<scene_corners[i]<<"   "<<i<<endl;
 	  //cout<<scene_corners[i].x<<endl;
+
 	  if(scene_corners[i].x<w_min)
 	      w_min=scene_corners[i].x;
 	  if(scene_corners[i].x>w_max)
@@ -351,7 +367,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	      h_max=scene_corners[i].y;
 	  
       }
+
       //cout<<"WH   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
+
       //新建一个矩阵存储配准后四角的位置
       width = w_max-w_min+50;
       //int height= img1.rows;
@@ -364,7 +382,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  scene_corners[i].x-=offset.x;
 	  scene_corners[i].y-=offset.y;
       }
+
       //cout<<"out size "<<width<<"  "<<height<<endl;
+
       
       Mat H1 = getPerspectiveTransform(obj_corners, scene_corners);
       return H1;
@@ -394,7 +414,9 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       {
 	  if ( status1[i]== 0 ||status2[i]==0)
 	  {
+
 	      //cout<<"################################## "<<status1[i]<<endl;
+
 	      iter = kps_1.erase(iter);
 	      iter2 = kps_2.erase(iter2);
 	  }
@@ -404,6 +426,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	  iter++;
 	  iter2++;
       } 
+
    
      
      
@@ -456,4 +479,5 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       for(auto k:kps_2)
 	  prev_key2.push_back(k);   
       //cout<<"after kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
+
   }
