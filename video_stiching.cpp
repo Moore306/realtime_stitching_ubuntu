@@ -43,11 +43,11 @@ int main()
     int index=0;
     capture1.open(2);
     capture2.open(0);
-    //    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-    //   capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+    capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+    capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     //   
-    //    capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-    //   capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+    capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+    capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     namedWindow("img11",0);
     namedWindow("img22",0);
     namedWindow("result",0);
@@ -117,8 +117,7 @@ int main()
 		index=0;
 		continue;
 	    }
-	    for(auto kp:kps2)
-		cout<<kp<<endl;
+	   
 	    Mat H1 = findHomography(kps1, kps2, CV_RANSAC);
 	    if(H1.empty())
 	    {
@@ -435,7 +434,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       {
 	  if ( status1[i]== 0||status2[i]==0)
 	  {
-	      cout<<"################################## "<<status2[i]<<endl;
+	      //cout<<"################################## "<<status2[i]<<endl;
 	      iter = kps_1.erase(iter);
 	      iter2 = kps_2.erase(iter2);
 	  }
