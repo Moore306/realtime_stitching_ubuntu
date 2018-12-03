@@ -306,12 +306,10 @@ int main()
 	chrono::steady_clock::time_point t3 = chrono::steady_clock::now();
 	
 	Mat H1=Get_blendSize(width,height,H,offset,overflap_corners);
-	chrono::steady_clock::time_point t4 = chrono::steady_clock::now();
-	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
-	cout<<"flapover region  use time："<<time_used.count()<<" seconds."<<endl;
-	cout<<"get H1 "<<H1<<endl;
+	
+	//cout<<"get H1 "<<H1<<endl;
 	H=(Mat1f)H1.clone();
-	cout<<"success "<<endl;
+	//cout<<"success "<<endl;
 	//cout<<"another H "<<H<<endl;
 	//cout <<width<<"  "<<height<<endl;
 	
@@ -349,18 +347,27 @@ int main()
 	seam_mask.setTo(0);
 	img_p=flap.data+region_h*region_w;
 	seamline(img_p, region_w,region_h,seam_mask);
-	
-	imshow("seamline",seam_mask);
-	imwrite("flap1.jpg",flapimg1);
-	imwrite("flap2.jpg",flapimg2);
-	imwrite("flap_mask.jpg",seam_mask);
+	chrono::steady_clock::time_point t4 = chrono::steady_clock::now();
+	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
+	cout<<"flapover region  use time："<<time_used.count()<<" seconds."<<endl;
+	sprintf(info,"Result/flap1_%02d.jpg",index);
+	//imshow("seamline",seam_mask);
+	//imwrite(info,flapimg1);
+	sprintf(info,"Result/flap2_%02d.jpg",index);
+	//imwrite(info,flapimg2);
+	sprintf(info,"Result/flap_mask_%02d.jpg",index);
+	//imwrite(info,seam_mask);
 	//void Multiblending(Mat3b& l8u,Mat3b& r8u,Mat& blend_mask,Mat3b& result)
-	cout<<"result   __________________"<<endl;
+	//cout<<"result   __________________"<<endl;
 	Multiblending(flapimg1,flapimg2,seam_mask,result);
 	
 	result.copyTo(tiledImg(region));
+	sprintf(info,"Result/blending_result_%02d.jpg",index);
 	imshow("result",tiledImg);
-	imwrite("blending_result.jpg",result);
+	//imwrite(info,tiledImg);
+	t4 = chrono::steady_clock::now();
+	time_used = chrono::duration_cast<chrono::duration<double>>( t4-t1 );
+	cout<<"total  use time："<<time_used.count()<<" seconds."<<endl;
 	//cout<<"result   __________________"<<endl;
 	/*
 	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type()),tiledImg3;
@@ -452,8 +459,10 @@ Rect get_overflap_region(vector<Point> &overflap_corners)
 	
     }
     
-    w=max_x-min_x;
-    h=max_y-min_y;
+    w=max_x-min_x+2;
+    h=max_y-min_y+2;
+    min_x-=1;
+    min_y-=1;
     return Rect(min_x,min_y,w,h);
     
 }
@@ -848,14 +857,14 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	 
 	 scenes[i].x=scene_corners[i].x;
 	 scenes[i].y=scene_corners[i].y;
-	 cout<<objs[i]<<"   "<<scenes[i]<<endl;
+	 //cout<<objs[i]<<"   "<<scenes[i]<<endl;
      }
      
      bool isflap=PolygonClip(objs,scenes,overflap_corners);
 
      
-     for(auto cor:overflap_corners)
-	 cout<<"cor "<<cor<<endl;
+     //for(auto cor:overflap_corners)
+	// cout<<"cor "<<cor<<endl;
      return H1;
      
  }
@@ -880,11 +889,11 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 		 x,y))
 	     {
 		 interPoly.push_back(cv::Point(x,y));
-		 cout<<"____ "<<Point(x,y)<<" i,j "<<i<<j<<endl;
+		 //cout<<"____ "<<Point(x,y)<<" i,j "<<i<<j<<endl;
 	     }
 	 }
      }
-     cout<<"inter poly.size "<<interPoly.size()<<endl;
+     //cout<<"inter poly.size "<<interPoly.size()<<endl;
      //计算多边形内部点
      for(int i = 0;i < poly1.size();i++)
      {
@@ -1027,7 +1036,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	     tmpLeft = b2*(p2.y-p1.y)-b1*(q2.y-q1.y);
 	     
 	     y = (int)((double)tmpLeft/(double)tmpRight);
-	     cout<<"line cross point "<<p1<<p2<<q1<<q2<<x<<y<<endl;
+	     //cout<<"line cross point "<<p1<<p2<<q1<<q2<<x<<y<<endl;
 	     return true;
 	 }
      }
