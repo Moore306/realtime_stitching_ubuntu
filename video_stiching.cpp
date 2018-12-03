@@ -1,3 +1,4 @@
+//#include"regions.h"
 #include <iostream>
 #include <fstream>
 #include <list>
@@ -18,6 +19,16 @@ using namespace std;
 using namespace cv;
 cv::Mat color, depth, last_color;
 
+
+bool PolygonClip(const vector<Point> &poly1,const vector<Point> &poly2, std::vector<Point> &interPoly);
+void ClockwiseSortPoints(std::vector<Point> &vPoints);
+bool PointCmp(const Point &a,const Point &b,const Point &center);
+bool IsPointInPolygon(std::vector<Point> poly,Point pt);
+bool IsRectCross(const Point &p1,const Point &p2,const Point &q1,const Point &q2);
+bool IsLineSegmentCross(const Point &pFirst1,const Point &pFirst2,const Point &pSecond1,const Point &pSecond2);
+bool GetCrossPoint(const Point &p1,const Point &p2,const Point &q1,const Point &q2,long &x,long &y);
+Mat Get_blendSize(int& width, int& height, Mat1f& H,Point& offset,vector<Point>& overflap_corners);
+
 bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2);
 void regis(Mat& img1,Mat& img2,vector<Point2f>& obj,vector<Point2f>& scene,Mat &H);
 
@@ -29,6 +40,7 @@ Mat pre_frame1,pre_frame2;
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,list<Point2f> &kps_1,list<Point2f> & kps_2);
 
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,vector<Point2f>& prev_key1,vector<Point2f>&prev_key2);
+
 
 
 int main()
@@ -43,8 +55,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open(2);
-    capture2.open(0);
+    capture1.open("test1.mkv");
+    capture2.open("test2.mkv");
 //     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
 //     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //     //   
@@ -55,7 +67,7 @@ int main()
     namedWindow("result",0);
     vector<Point2f> kps1,kps2;
     char info[500];
-
+    int w_index=0;
     while(true)
     {
 	
@@ -173,10 +185,21 @@ int main()
 	//cout<<"use "<<H.empty()<<endl;
 
 	//H=H1;;
-	Point2f offset(0,0);
+	Point offset(0,0);
 	//cout <<width<<"  "<<height<<endl;
-	Mat1f H1=Get_blendSize(width, height, H,offset);
-	H=H1.clone();
+	//Mat1f H1=Get_blendSize(width, height, H,offset);
+	vector<Point> overflap_corners;
+	////Mat Get_blendSize(int& width, int& height, Mat1f& H,Point& offset,vector<Point>& overfalp_corners);
+	
+	chrono::steady_clock::time_point t3 = chrono::steady_clock::now();
+	
+	Mat H1=Get_blendSize(width,height,H,offset,overflap_corners);
+	chrono::steady_clock::time_point t4 = chrono::steady_clock::now();
+	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
+	cout<<"flapover region  use time："<<time_used.count()<<" seconds."<<endl;
+	cout<<"get H1 "<<H1<<endl;
+	H=(Mat1f)H1.clone();
+	cout<<"success "<<endl;
 	//cout<<"another H "<<H<<endl;
 	//cout <<width<<"  "<<height<<endl;
 	
@@ -199,14 +222,19 @@ int main()
 	img22/=2;
 	img22.copyTo(Mat(tiledImg2,Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
 	chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t2-t1 );
+	time_used = chrono::duration_cast<chrono::duration<double>>( t2-t1 );
 	cout<<"LK Flow use time："<<time_used.count()<<" seconds."<<endl;
+	
+	
 	//imwrite("tied.jpg",tiledImg);
 	tiledImg2=tiledImg2/2+tiledImg/2;
+	for(auto cor:overflap_corners)
+	    circle(tiledImg2, cor, 10, Scalar(240, 240, 0), 1);
 	
 	imshow("result",tiledImg2);
-	//imwrite("result.jpg",tiledImg2);
-	
+	imwrite("result.jpg",tiledImg2);
+	if(w_index++==50)
+	    break;
 	
 
     }
@@ -255,7 +283,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       scene.clear();
       // ORB算法继承Feature2D基类
 
-      Ptr<ORB> orb = ORB::create(4000, 1.2, 8, 31, 0, 2, 0, 31, 20);  
+      Ptr<ORB> orb = ORB::create(4000, 1.2, 3, 31, 0, 2, 0, 31, 20);  
 
       // 调整精度，值越小点越少，越精准
       vector<KeyPoint> kpts1, kpts2;
@@ -481,3 +509,255 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       //cout<<"after kps num "<<prev_key1.size()<<"  "<<prev_key2.size()<<endl;
 
   }
+  
+ /////////////////////////////////////////////////////////////////////////////
+ Mat Get_blendSize(int& width, int& height, Mat1f& H,Point& offset,vector<Point>& overflap_corners)
+ {
+     //存储左图四角，及其变换到右图位置
+     std::vector<Point2f> obj_corners(4);
+     obj_corners[0] = Point2f(0, 0); obj_corners[1] = Point2f(width,0);
+     obj_corners[2] = Point2f(width, height); obj_corners[3] = Point2f(0, height);
+     
+     //cout<<obj_corners[2]<<endl;
+     
+     std::vector<Point2f> scene_corners(4);
+     
+     perspectiveTransform(obj_corners, scene_corners, H);
+     
+     
+     //储存偏移量
+     float w_min=0,h_max=height,w_max=width,h_min=0;
+     
+     //cout<<"WH pre   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
+     for(int i=0;i<4;i++)
+     {
+	 //cout<<scene_corners[i]<<"   "<<i<<endl;
+	 //cout<<scene_corners[i].x<<endl;
+	 
+	 if(scene_corners[i].x<w_min)
+	     w_min=scene_corners[i].x;
+	 if(scene_corners[i].x>w_max)
+	     w_max=scene_corners[i].x;
+	 if(scene_corners[i].y<h_min)
+	     h_min=scene_corners[i].y;
+	 if(scene_corners[i].y>h_max)
+	     h_max=scene_corners[i].y;
+	 
+     }
+     
+     //cout<<"WH   "<<w_max<<" "<<h_max<<"  "<<w_min<<"  "<<h_min<<endl;
+     
+     //新建一个矩阵存储配准后四角的位置
+     width = w_max-w_min+50;
+     //int height= img1.rows;
+     height = h_max-h_min+50;
+     
+     offset.x=w_min;
+     offset.y=h_min;
+     for(int i=0;i<4;i++)
+     {
+	 scene_corners[i].x-=offset.x;
+	 scene_corners[i].y-=offset.y;
+     }
+     
+     //cout<<"out size "<<width<<"  "<<height<<endl;
+     
+     
+     Mat H1 = getPerspectiveTransform(obj_corners, scene_corners);
+     
+     vector<Point> objs(4),scenes(4);
+     for(int i=0;i<4;i++)
+     {
+	 objs[i].x=obj_corners[i].x-offset.x;
+	 objs[i].y=obj_corners[i].y-offset.y;
+	 
+	 
+	 scenes[i].x=scene_corners[i].x;
+	 scenes[i].y=scene_corners[i].y;
+	 cout<<objs[i]<<"   "<<scenes[i]<<endl;
+     }
+     
+     bool isflap=PolygonClip(objs,scenes,overflap_corners);
+
+     
+     for(auto cor:overflap_corners)
+	 cout<<"cor "<<cor<<endl;
+     return H1;
+     
+ }
+ 
+ bool PolygonClip(const vector<Point> &poly1,const vector<Point> &poly2, std::vector<Point> &interPoly)
+ {
+     if (poly1.size() < 3 || poly2.size() < 3)
+     {
+	 return false;
+     }
+     
+     long x,y;
+     //计算多边形交点
+     for (int i = 0;i < poly1.size();i++)
+     {
+	 int poly1_next_idx = (i + 1) % poly1.size();
+	 for (int j = 0;j < poly2.size();j++)
+	 {
+	     int poly2_next_idx = (j + 1) % poly2.size();
+	     if (GetCrossPoint(poly1[i],poly1[poly1_next_idx],
+		 poly2[j],poly2[poly2_next_idx],
+		 x,y))
+	     {
+		 interPoly.push_back(cv::Point(x,y));
+		 cout<<"____ "<<Point(x,y)<<" i,j "<<i<<j<<endl;
+	     }
+	 }
+     }
+     cout<<"inter poly.size "<<interPoly.size()<<endl;
+     //计算多边形内部点
+     for(int i = 0;i < poly1.size();i++)
+     {
+	 if(IsPointInPolygon(poly2,poly1[i]))
+	 {
+	     interPoly.push_back(poly1[i]);
+	 }
+     }
+     for (int i = 0;i < poly2.size();i++)
+     {
+	 if (IsPointInPolygon(poly1,poly2[i]))
+	 {
+	     interPoly.push_back(poly2[i]);
+	 }
+     }
+     
+     if(interPoly.size() <= 0)
+	 return false;
+     
+     //点集排序 
+     ClockwiseSortPoints(interPoly);
+     return true;
+ }
+ void ClockwiseSortPoints(std::vector<Point> &vPoints)
+ {
+     //计算重心
+     cv::Point center;
+     double x = 0,y = 0;
+     for (int i = 0;i < vPoints.size();i++)
+     {
+	 x += vPoints[i].x;
+	 y += vPoints[i].y;
+     }
+     center.x = (int)x/vPoints.size();
+     center.y = (int)y/vPoints.size();
+     
+     //冒泡排序
+     for(int i = 0;i < vPoints.size() - 1;i++)
+     {
+	 for (int j = 0;j < vPoints.size() - i - 1;j++)
+	 {
+	     if (PointCmp(vPoints[j],vPoints[j+1],center))
+	     {
+		 cv::Point tmp = vPoints[j];
+		 vPoints[j] = vPoints[j + 1];
+		 vPoints[j + 1] = tmp;
+	     }
+	 }
+     }
+ }
+ bool PointCmp(const Point &a,const Point &b,const Point &center)
+ {
+     if (a.x >= 0 && b.x < 0)
+	 return true;
+     if (a.x == 0 && b.x == 0)
+	 return a.y > b.y;
+     //向量OA和向量OB的叉积
+     int det = (a.x - center.x) * (b.y - center.y) - (b.x - center.x) * (a.y - center.y);
+     if (det < 0)
+	 return true;
+     if (det > 0)
+	 return false;
+     //向量OA和向量OB共线，以距离判断大小
+     int d1 = (a.x - center.x) * (a.x - center.x) + (a.y - center.y) * (a.y - center.y);
+     int d2 = (b.x - center.x) * (b.x - center.y) + (b.y - center.y) * (b.y - center.y);
+     return d1 > d2;
+ }
+ bool IsRectCross(const Point &p1,const Point &p2,const Point &q1,const Point &q2)
+ {
+     bool ret = min(p1.x,p2.x) <= max(q1.x,q2.x)    &&
+     min(q1.x,q2.x) <= max(p1.x,p2.x) &&
+     min(p1.y,p2.y) <= max(q1.y,q2.y) &&
+     min(q1.y,q2.y) <= max(p1.y,p2.y);
+     return ret;
+ }
+ //跨立判断
+ bool IsLineSegmentCross(const Point &pFirst1,const Point &pFirst2,const Point &pSecond1,const Point &pSecond2)
+ {
+     long line1,line2;
+     line1 = pFirst1.x * (pSecond1.y - pFirst2.y) +
+     pFirst2.x * (pFirst1.y - pSecond1.y) +
+     pSecond1.x * (pFirst2.y - pFirst1.y);
+     line2 = pFirst1.x * (pSecond2.y - pFirst2.y) +
+     pFirst2.x * (pFirst1.y - pSecond2.y) + 
+     pSecond2.x * (pFirst2.y - pFirst1.y);
+     if (((line1 ^ line2) >= 0) && !(line1 == 0 && line2 == 0))
+	 return false;
+     
+     line1 = pSecond1.x * (pFirst1.y - pSecond2.y) +
+     pSecond2.x * (pSecond1.y - pFirst1.y) +
+     pFirst1.x * (pSecond2.y - pSecond1.y);
+     line2 = pSecond1.x * (pFirst2.y - pSecond2.y) + 
+     pSecond2.x * (pSecond1.y - pFirst2.y) +
+     pFirst2.x * (pSecond2.y - pSecond1.y);
+     if (((line1 ^ line2) >= 0) && !(line1 == 0 && line2 == 0))
+	 return false;
+     return true;
+ }
+ 
+ bool GetCrossPoint(const Point &p1,const Point &p2,const Point &q1,const Point &q2,long &x,long &y)
+ {
+     
+     if(IsRectCross(p1,p2,q1,q2))
+     {
+	 if (IsLineSegmentCross(p1,p2,q1,q2))
+	 {
+	     //求交点
+	     long tmpLeft,tmpRight,b1,b2;
+	     b1=(p2.y-p1.y)*p1.x+(p1.x-p2.x)*p1.y;
+	     b2=(q2.y-q1.y)*q1.x+(q1.x-q2.x)*q1.y;
+	     
+	     //tmpLeft = (q2.x - q1.x) * (p1.y - p2.y) - (p2.x - p1.x) * (q1.y - q2.y);
+	     //tmpRight = (p1.y - q1.y) * (p2.x - p1.x) * (q2.x - q1.x) + q1.x * (q2.y - q1.y) * (p2.x - p1.x) - p1.x * (p2.y - p1.y) * (q2.x - q1.x);
+	     
+	     tmpLeft = b2*(p2.x-p1.x)-b1*(q2.x-q1.x);
+	     
+	     tmpRight = (p2.x-p1.x)*(q2.y-q1.y)-(q2.x-q1.x)*(p2.y-p1.y);
+	     
+	     
+	     x = (int)((double)tmpLeft/(double)tmpRight);
+	     
+// 	     tmpLeft = (p1.x - p2.x) * (q2.y - q1.y) - (p2.y - p1.y) * (q1.x - q2.x);
+// 	     tmpRight = p2.y * (p1.x - p2.x) * (q2.y - q1.y) + (q2.x- p2.x) * (q2.y - q1.y) * (p1.y - p2.y) - q2.y * (q1.x - q2.x) * (p2.y - p1.y); 
+	     tmpLeft = b2*(p2.y-p1.y)-b1*(q2.y-q1.y);
+	     
+	     y = (int)((double)tmpLeft/(double)tmpRight);
+	     cout<<"line cross point "<<p1<<p2<<q1<<q2<<x<<y<<endl;
+	     return true;
+	 }
+     }
+     
+     return false;
+ }
+ 
+ bool IsPointInPolygon(std::vector<Point> poly,Point pt)
+ {
+     int i,j;
+     bool c = false;
+     for (i = 0,j = poly.size() - 1;i < poly.size();j = i++)
+     {
+	 if ((((poly[i].y <= pt.y) && (pt.y < poly[j].y)) ||
+	     ((poly[j].y <= pt.y) && (pt.y < poly[i].y)))
+	     && (pt.x < (poly[j].x - poly[i].x) * (pt.y - poly[i].y)/(poly[j].y - poly[i].y) + poly[i].x))
+	 {
+	     c = !c;
+	 }
+     }
+     return c;
+ }
+ 
