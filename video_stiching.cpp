@@ -42,6 +42,111 @@ void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,list<Point2f> &kps_1,list
 void opt_track(Mat pre_1,Mat cur_1,Mat pre_2,Mat cur_2,vector<Point2f>& prev_key1,vector<Point2f>&prev_key2);
 
 
+Rect get_overflap_region(vector<Point>& overflap_corners);
+void seamline(unsigned char* img, int width,int height,Mat& seam_mask);
+void Multiblending(Mat3b& l8u,Mat3b& r8u,Mat& blend_mask,Mat3b& result);
+class LaplacianBlending {
+private:
+    Mat_<Vec3f> left;
+    Mat_<Vec3f> right;
+    Mat_<float> blendMask;
+    
+    vector<Mat_<Vec3f> > leftLapPyr,rightLapPyr,resultLapPyr;//Laplacian Pyramids
+    Mat leftHighestLevel, rightHighestLevel, resultHighestLevel;
+    vector<Mat_<Vec3f> > maskGaussianPyramid; //masks are 3-channels for easier multiplication with RGB
+    
+    int levels;
+    
+    void buildPyramids() {
+	buildLaplacianPyramid(left,leftLapPyr,leftHighestLevel);
+	buildLaplacianPyramid(right,rightLapPyr,rightHighestLevel);
+	buildGaussianPyramid();
+    }
+    
+    
+    void buildGaussianPyramid(){//金字塔内容为每一层的掩模
+	assert(leftLapPyr.size()>0);
+	
+	maskGaussianPyramid.clear();
+	Mat currentImg;
+	cvtColor(blendMask,currentImg, CV_GRAY2BGR);//store color img of blend mask
+	maskGaussianPyramid.push_back(currentImg); //0-level
+	
+	currentImg = blendMask;
+	for (int l=1; l<levels+1; l++){
+	    Mat _down;
+	    if(leftLapPyr.size() > l)
+		pyrDown(currentImg, _down, leftLapPyr[l].size());
+	    else
+		pyrDown(currentImg, _down, leftHighestLevel.size()); //lowest level
+		
+		Mat down;
+	    cvtColor(_down, down, CV_GRAY2BGR);
+	    maskGaussianPyramid.push_back(down);//add color blend mask into mask Pyramid
+	    currentImg = _down;
+	}
+    }
+    
+    void buildLaplacianPyramid(const Mat& img, vector<Mat_<Vec3f> >& lapPyr, Mat& HighestLevel){
+	lapPyr.clear();
+	Mat currentImg = img;
+	for (int l=0; l<levels; l++) {
+	    Mat down,up;
+	    pyrDown(currentImg, down);
+	    pyrUp(down, up,currentImg.size());
+	    Mat lap = currentImg - up;
+	    lapPyr.push_back(lap);
+	    currentImg = down;
+	}
+	currentImg.copyTo(HighestLevel);
+    }
+    
+    Mat_<Vec3f> reconstructImgFromLapPyramid(){
+	//将左右laplacian图像拼成的resultLapPyr金字塔中每一层
+	//从上到下插值放大并相加,即得blend图像结果
+	Mat currentImg = resultHighestLevel;
+	for(int l=levels-1; l>=0; l--){
+	    Mat up;
+	    
+	    pyrUp(currentImg, up, resultLapPyr[l].size());
+	    currentImg = up + resultLapPyr[l];
+	}
+	return currentImg;
+    }
+    
+    void blendLapPyrs(){
+	//获得每层金字塔中直接用左右两图Laplacian变换拼成的图像resultLapPyr
+	resultHighestLevel = leftHighestLevel.mul(maskGaussianPyramid.back()) + 
+	rightHighestLevel.mul(Scalar(1.0,1.0,1.0) - maskGaussianPyramid.back());
+	for (int l=0; l<levels; l++){
+	    Mat A = leftLapPyr[l].mul(maskGaussianPyramid[l]);
+	    Mat antiMask = Scalar(1.0, 1.0, 1.0) - maskGaussianPyramid[l];
+	    Mat B = rightLapPyr[l].mul(antiMask);
+	    Mat_<Vec3f> blendedLevel = A + B;
+	    
+	    resultLapPyr.push_back(blendedLevel);
+	}
+    }
+    
+public:
+    LaplacianBlending(const Mat_<Vec3f>& _left, const Mat_<Vec3f>& _right, const Mat_<float>& _blendMask, int _levels)://construct function, used in LaplacianBlending lb(l,r,m,4);
+    left(_left),right(_right),blendMask(_blendMask),levels(_levels)
+    {
+	assert(_left.size() == _right.size());
+	assert(_left.size() == _blendMask.size());
+	buildPyramids();  //construct Laplacian Pyramid and Gaussian Pyramid
+	blendLapPyrs();   //blend left & right Pyramids into one Pyramid
+    };
+    
+    Mat_<Vec3f> blend() {
+	return reconstructImgFromLapPyramid();//reconstruct Image from Laplacian Pyramid
+    }
+};
+
+Mat_<Vec3f> LaplacianBlend(const Mat_<Vec3f>& l, const Mat_<Vec3f>& r, const Mat_<float>& m) {
+    LaplacianBlending lb(l,r,m,4);
+    return lb.blend();
+}
 
 int main()
 {
@@ -57,17 +162,19 @@ int main()
     int index=0;
     capture1.open("test1.mkv");
     capture2.open("test2.mkv");
-//     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-//     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //     //   
-//     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-//     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     namedWindow("img11",0);
     namedWindow("img22",0);
     namedWindow("result",0);
     vector<Point2f> kps1,kps2;
     char info[500];
     int w_index=0;
+    unsigned char * img_p=nullptr;
+    Mat3b result;
     while(true)
     {
 	
@@ -84,7 +191,8 @@ int main()
 	capture1>>img11;
 	capture2>>img22;
 
-	
+	//resize(img11,img11,Size(),0.3,0.3);
+	//resize(img22,img22,Size(),0.3,0.3);
 	resizeWindow("img11", 640, 480);
 	resizeWindow("img22", 640, 480);
 	resizeWindow("result", 640, 480);
@@ -100,6 +208,7 @@ int main()
 	if (img1.empty() || img2.empty() || img1.channels() != 1 || img2.channels() != 1)
 	{
 	    cout << "Input Image is nullptr or the image channels is not gray!" << endl;
+	    break;
 	    //system("pause");
 	}
 
@@ -112,7 +221,10 @@ int main()
 	    regis(img1,img2,kps1,kps2,H);
 	    cout<<"匹配点个数 "<<kps1.size()<<endl;
 	    if(kps1.size()==0)
-		break;
+	    {
+		index=0;
+		continue;
+	    }
 	    
 	    Mat img110,img220;
 	    img110=img11.clone();
@@ -213,12 +325,47 @@ int main()
 	
 	//cout <<"shift "<<offset<<endl;
 	//拼接图像
+	Mat3b flapimg1,flapimg2; 
 	Mat tiledImg;
 	//Mat shftMat=(Mat_<double>(3,3)<<1.0,0,offset.x, 0,1.0,offset.y, 0,0,1.0);
 	//warpPerspective(img11,tiledImg,shftMat*H,Size(width+50,height+50));
+	
+	Mat Mask(height,width,CV_8UC1),Mask2(height,width,CV_8UC1);
+	Rect region=get_overflap_region(overflap_corners);
+	Mask.setTo(0);Mask2.setTo(255);
+	vector<vector<Point>> contours;
+	contours.push_back(overflap_corners);
+	fillPoly(Mask, contours,Scalar(255, 255, 255));
 	warpPerspective(img11,tiledImg,H,Size(width,height));
-	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type());
+	flapimg2=tiledImg(region).clone();
+	tiledImg.setTo(0,Mask);
+	img22.copyTo(tiledImg(Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
+	flapimg1=tiledImg(region).clone();
+	tiledImg.setTo(0,Mask);
+	Mat3b flap=flapimg1-flapimg2; //de dao chongdie quyu cha zhi
+	int region_w=region.width,region_h=region.height;
+	Mat seam_mask(region_h,region_w,CV_8UC1);
+	seam_mask.setTo(0);
+	seam_mask.setTo(0);
+	img_p=flap.data+region_h*region_w;
+	seamline(img_p, region_w,region_h,seam_mask);
+	
+	imshow("seamline",seam_mask);
+	imwrite("flap1.jpg",flapimg1);
+	imwrite("flap2.jpg",flapimg2);
+	imwrite("flap_mask.jpg",seam_mask);
+	//void Multiblending(Mat3b& l8u,Mat3b& r8u,Mat& blend_mask,Mat3b& result)
+	cout<<"result   __________________"<<endl;
+	Multiblending(flapimg1,flapimg2,seam_mask,result);
+	
+	result.copyTo(tiledImg(region));
+	imshow("result",tiledImg);
+	imwrite("blending_result.jpg",result);
+	//cout<<"result   __________________"<<endl;
+	/*
+	Mat tiledImg2=Mat::zeros(tiledImg.rows,tiledImg.cols,tiledImg.type()),tiledImg3;
 	//cout<<tiledImg2.size()<<tiledImg.size()<<endl;
+	tiledImg3=tiledImg2.clone();
 	img22/=2;
 	img22.copyTo(Mat(tiledImg2,Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
 	chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
@@ -231,15 +378,142 @@ int main()
 	for(auto cor:overflap_corners)
 	    circle(tiledImg2, cor, 10, Scalar(240, 240, 0), 1);
 	
-	imshow("result",tiledImg2);
-	imwrite("result.jpg",tiledImg2);
+	Mat Mask(height,width,CV_8UC1),Mask2(height,width,CV_8UC1);
+	Mask.setTo(0);Mask2.setTo(255);
+	vector<vector<Point>> contours;
+	contours.push_back(overflap_corners);
+	
+	//polylines(Mask, overflap_corners, npts,1,1,cv::Scalar(255, 255, 255), 1, 8,0);
+	//polylines(Mask, overflap_corners, true, cv::Scalar(255, 255, 255), 5);
+// 	for(int i=0;i<overflap_corners.size();i++)
+// 	    line(Mask,overflap_corners[i],overflap_corners[(i+1)%overflap_corners.size()],Scalar(255, 255, 255),5);
+	t3 = chrono::steady_clock::now();
+	Rect region=get_overflap_region(overflap_corners);
+	
+	//polylines(Mask, contours, true, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+	fillPoly(Mask, contours,Scalar(255, 255, 255));
+	//img22.copyTo(Mat(tiledImg3,Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
+	//cout<<img22.size()<<tiledImg3.size()<<Mask.size()<<endl;
+	img22.copyTo(tiledImg3(Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
+	img22.copyTo(tiledImg2(Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
+	tiledImg3.setTo(0,Mask2-Mask);
+	tiledImg2.setTo(0,Mask);
+	//rectangle(tiledImg3,region.tl(),region.br(),Scalar(0, 255, 255), 2, 4);
+	Mat3b flapimg=tiledImg3(region);
+	int region_w=region.width,region_h=region.height;
+	Mat seam_mask(region_h,region_w,CV_8UC1);
+	seam_mask.setTo(0);
+	
+	img_p=flapimg.data+region_h*region_w;
+	//img_p=flapimg.data;
+	imshow("flap_region",flapimg);
+	
+	seamline(img_p, region_w,region_h,seam_mask);
+	imwrite("flap_region.jpg",seam_mask);
+	tiledImg3.setTo(0);
+	img22.copyTo(tiledImg3(Rect(abs(offset.x),abs(offset.y),img2.cols,img2.rows)));
+	Mask.setTo(0);
+	seam_mask.copyTo(Mask(region));
+	tiledImg3.setTo(0,Mask2-Mask);
+	
+	//seam_mask.release();
+	cout<<"**********************"<<endl;
+	imshow("result",tiledImg3);
+	imwrite("result.jpg",tiledImg3);
+	//imwrite("seamMask.jpg",seam_mask);
+	t4 = chrono::steady_clock::now();
+	time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
+	cout<<"warp  use time："<<time_used.count()<<" seconds."<<endl;
 	if(w_index++==50)
 	    break;
 	
+	*/
 
     }
 }
 
+
+Rect get_overflap_region(vector<Point> &overflap_corners)
+{
+    int min_x,min_y,max_x,max_y,w,h;
+    min_x=max_x=overflap_corners[0].x;
+    min_y=max_y=overflap_corners[0].y;
+    for(int i=1;i<overflap_corners.size();i++)
+    {
+	if(overflap_corners[i].x>max_x)
+	    max_x=overflap_corners[i].x;
+	if(overflap_corners[i].y>max_y)
+	    max_y=overflap_corners[i].y;
+	
+	if(overflap_corners[i].x<min_x)
+	    min_x=overflap_corners[i].x;
+	if(overflap_corners[i].y<min_y)
+	    min_y=overflap_corners[i].y;
+	
+    }
+    
+    w=max_x-min_x;
+    h=max_y-min_y;
+    return Rect(min_x,min_y,w,h);
+    
+}
+void seamline(unsigned char* img, int width,int height,Mat& seam_mask)
+{
+    
+    int j,min_j=width/2;
+    //cout<<" min_j "<<min_j<<endl;
+    int i=0;
+    uchar min_cost;
+    long index;
+    seam_mask.at<uchar>(i,min_j)=255;
+    seam_mask.at<uchar>(i,min_j-1)=255;
+    seam_mask.at<uchar>(i,min_j+1)=255;
+  
+    for(int i=1;i<height;i++)
+    {
+	//cout<<i<<"         i   "<<width<<"  "<<height<<"  "<<min_j<<endl;
+	index=i*width+min_j;
+	min_cost=img[index];
+	if(min_cost==0)
+	{
+	    for(int k=-1;k<=1;k++)
+	    {
+		j=min_j+k;
+		if(j>0&&j<width)
+		    seam_mask.at<uchar>(i,j)=255;
+	    }
+	    continue;
+	    
+	}
+	for(int k=-1;k<=1;k++)
+	{
+	    j=min_j+k;
+	    if(j<0||j>width-1)
+		continue;
+	    if(img[i*width+j]<min_cost)
+	    {
+		//cout<<img[i*width+j]-'0'<<" ";
+		min_j=j;
+		//cout<<"k   "<<k<<endl;
+	    }
+	    //cout<<endl;
+	}
+	for(int k=-1;k<=1;k++)
+	{
+	    j=min_j+k;
+	    if(j>0&&j<width)
+		seam_mask.at<uchar>(i,j)=255;
+	}
+    }
+    for(int i=0;i<height;i++)
+	for(int j=0;j<width;j++)
+	{
+	    if(seam_mask.at<uchar>(i,j)==255)
+		break;
+	    seam_mask.at<uchar>(i,j)=255;
+	}
+    return;
+}
 
 
 
@@ -412,7 +686,7 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
       }
 
       //cout<<"out size "<<width<<"  "<<height<<endl;
-
+      
       
       Mat H1 = getPerspectiveTransform(obj_corners, scene_corners);
       return H1;
@@ -631,7 +905,11 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
 	 return false;
      
      //点集排序 
-     ClockwiseSortPoints(interPoly);
+     //ClockwiseSortPoints(interPoly);
+     vector<Point> hull;
+     convexHull(interPoly,hull,true);
+     interPoly.clear();
+     interPoly.assign(hull.begin(),hull.end());
      return true;
  }
  void ClockwiseSortPoints(std::vector<Point> &vPoints)
@@ -708,6 +986,18 @@ bool cvMatEQ(const cv::Mat& data1, const cv::Mat& data2)
      if (((line1 ^ line2) >= 0) && !(line1 == 0 && line2 == 0))
 	 return false;
      return true;
+ }
+ void Multiblending(Mat3b& l8u,Mat3b& r8u,Mat& blend_mask,Mat3b& result)
+ {
+     Mat_<Vec3f> l; l8u.convertTo(l,CV_32F,1.0/255.0);
+     Mat_<Vec3f> r; r8u.convertTo(r,CV_32F,1.0/255.0);
+     Mat_<float> mm;
+     //=(Mat<float>)blend_mask;
+     //Mat_<unsigned int> blend2= blend_mask;
+     blend_mask.convertTo(mm,CV_32F,1.0/255.0); 
+     
+     Mat_<Vec3f> blend = LaplacianBlend(l, r, mm);
+     blend.convertTo(result,CV_8UC3,255);
  }
  
  bool GetCrossPoint(const Point &p1,const Point &p2,const Point &q1,const Point &q2,long &x,long &y)
