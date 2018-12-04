@@ -160,8 +160,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open(2);
-    capture2.open(1);
+    capture1.open("test3.mkv");
+    capture2.open("test4.mkv");
      capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
      capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //     //   
@@ -193,9 +193,11 @@ int main()
 	
 	capture1>>img11;
 	capture2>>img22;
+	//resize(img11,img11,Size(),0.3,0.3);
+	//resize(img22,img22,Size(),0.3,0.3);
 	origin_h=img11.rows;
 	origin_w=img11.cols;
-
+	cout<<origin_w<<"   "<<origin_h<<endl;
 	//resize(img11,img11,Size(),0.3,0.3);
 	//resize(img22,img22,Size(),0.3,0.3);
 	resizeWindow("img11", 640, 480);
@@ -310,6 +312,8 @@ int main()
 	////Mat Get_blendSize(int& width, int& height, Mat1f& H,Point& offset,vector<Point>& overfalp_corners);
 	
 	chrono::steady_clock::time_point t3 = chrono::steady_clock::now();
+	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t3-t1 );
+	cout<<"stitching use time "<<time_used.count()<<" seconds."<<endl;
 	
 	Mat H1=Get_blendSize(width,height,H,offset,overflap_corners);
 	
@@ -354,7 +358,7 @@ int main()
 	img_p=flap.data+region_h*region_w;
 	seamline(img_p, region_w,region_h,seam_mask);
 	chrono::steady_clock::time_point t4 = chrono::steady_clock::now();
-	chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
+	time_used = chrono::duration_cast<chrono::duration<double>>( t4-t3 );
 	cout<<"flapover region  use time："<<time_used.count()<<" seconds."<<endl;
 	sprintf(info,"Result/flap1_%02d.jpg",index);
 	//imshow("seamline",seam_mask);
