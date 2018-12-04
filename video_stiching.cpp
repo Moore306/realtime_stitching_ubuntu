@@ -162,11 +162,11 @@ int main()
     int index=0;
     capture1.open(2);
     capture2.open(1);
-     capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-     capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
-//     //   
-     capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
-     capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+//      capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//      capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
+// //     //   
+//      capture2.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
+//      capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     namedWindow("img11",0);
     namedWindow("img22",0);
     //namedWindow("result",0);
