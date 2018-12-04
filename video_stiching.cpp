@@ -169,12 +169,15 @@ int main()
      capture2.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     namedWindow("img11",0);
     namedWindow("img22",0);
-    namedWindow("result",0);
+    //namedWindow("result",0);
+    namedWindow("show_region",0);
     vector<Point2f> kps1,kps2;
     char info[500];
     int w_index=0;
     unsigned char * img_p=nullptr;
     Mat3b result;
+    int origin_w,origin_h;
+    Mat show_img;
     while(true)
     {
 	
@@ -190,13 +193,16 @@ int main()
 	
 	capture1>>img11;
 	capture2>>img22;
+	origin_h=img11.rows;
+	origin_w=img11.cols;
 
 	//resize(img11,img11,Size(),0.3,0.3);
 	//resize(img22,img22,Size(),0.3,0.3);
 	resizeWindow("img11", 640, 480);
 	resizeWindow("img22", 640, 480);
-	resizeWindow("result", 640, 480);
-	
+	//resizeWindow("result", 640, 480);
+	resizeWindow("show_region",640,480);
+	show_img=Mat::zeros(5*origin_h,5*origin_w,CV_8UC3);
 
 	
 	width=img11.cols;
@@ -363,7 +369,10 @@ int main()
 	
 	result.copyTo(tiledImg(region));
 	sprintf(info,"Result/blending_result_%02d.jpg",index);
-	imshow("result",tiledImg);
+	//imshow("result",tiledImg);
+	tiledImg.copyTo(Mat(show_img,Rect(0,region_h,tiledImg.cols,tiledImg.rows)));
+	Mat show_region=show_img(Rect(abs(offset.x),abs(offset.y),2*img2.cols,2.5*img2.rows));
+	imshow("show_region",show_region);
 	//imwrite(info,tiledImg);
 	t4 = chrono::steady_clock::now();
 	time_used = chrono::duration_cast<chrono::duration<double>>( t4-t1 );
