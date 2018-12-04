@@ -160,8 +160,8 @@ int main()
     Mat img1,img2;
     VideoCapture capture1,capture2;
     int index=0;
-    capture1.open("test1.mkv");
-    capture2.open("test2.mkv");
+    capture1.open(2);
+    capture2.open(1);
      capture1.set(CV_CAP_PROP_FRAME_WIDTH, 1920);  
      capture1.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
 //     //   
