@@ -1,0 +1,12 @@
+*.sh
+*.kdev4
+useLK.cpp
+build/
+bin/
+*.jpg
+*.avi
+*.mkv
+*.png
+data/
+bin/
+
